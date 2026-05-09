@@ -19,14 +19,26 @@ namespace Clock
         public string Title { get; set; }
         public string ClassName { get; set; }
         public string ProcessName { get; set; }
+        public string ExecutablePath { get; set; }
+
+        public TargetWindowInfo() { }
+
+        public TargetWindowInfo(string title, string className, string processName, string executablePath)
+        {
+            Title = title;
+            ClassName = className;
+            ProcessName = processName;
+            ExecutablePath = executablePath;
+        }
+
         public override string ToString() => string.IsNullOrWhiteSpace(Title) ? $"{ProcessName} ({ClassName})" : Title;
         public bool Equals(TargetWindowInfo other)
         {
             if (other is null) return false;
-            return ClassName == other.ClassName && ProcessName == other.ProcessName;
+            return ClassName == other.ClassName && ProcessName == other.ProcessName && ExecutablePath == other.ExecutablePath;
         }
         public override bool Equals(object obj) => Equals(obj as TargetWindowInfo);
-        public override int GetHashCode() => HashCode.Combine(ClassName, ProcessName);
+        public override int GetHashCode() => HashCode.Combine(ClassName, ProcessName, ExecutablePath);
     }
 
     public partial class MainViewModel : ObservableObject
@@ -154,25 +166,27 @@ namespace Clock
         {
             var sbTitle = new System.Text.StringBuilder(256);
             GetWindowText(hWnd, sbTitle, 256);
-            
+
             var sbClass = new System.Text.StringBuilder(256);
             GetClassName(hWnd, sbClass, 256);
 
             GetWindowThreadProcessId(hWnd, out uint pid);
             string processName = "";
+            string executablePath = "";
             try
             {
                 var proc = Process.GetProcessById((int)pid);
                 processName = proc.ProcessName;
+                executablePath = proc.MainModule?.FileName ?? "";
             }
             catch { }
 
-            return new TargetWindowInfo
-            {
-                Title = sbTitle.ToString(),
-                ClassName = sbClass.ToString(),
-                ProcessName = processName
-            };
+            return new TargetWindowInfo(
+                sbTitle.ToString(),
+                sbClass.ToString(),
+                processName,
+                executablePath
+            );
         }
 
         private bool IsTargetWindowFocused()
@@ -181,9 +195,7 @@ namespace Clock
             IntPtr handle = GetForegroundWindow();
             var info = GetWindowInfo(handle);
 
-            return TargetWindows.Any(w => 
-                (w.ClassName == info.ClassName || w.ProcessName == info.ProcessName) && 
-                (!string.IsNullOrEmpty(w.ClassName) || !string.IsNullOrEmpty(w.ProcessName)));
+            return TargetWindows.Any(w => w.Equals(info) && (!string.IsNullOrEmpty(w.ClassName) || !string.IsNullOrEmpty(w.ProcessName) || !string.IsNullOrEmpty(w.ExecutablePath)));
         }
 
         private void UpdateTimersUI()

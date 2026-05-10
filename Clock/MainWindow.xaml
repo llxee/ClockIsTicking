@@ -41,6 +41,7 @@
         <Grid>
             <!-- Top Controls -->
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10">
+                <Button Content="{Binding RestButtonText}" Margin="0,0,10,0" Command="{Binding ToggleRestCommand}"/>
                 <Button Content="⚙️ 设置" Margin="0,0,10,0" Command="{Binding OpenSettingsCommand}"/>
                 <Button Content="{Binding DayCountdownText}" Command="{Binding SetTargetDateCommand}"/>
             </StackPanel>
@@ -54,6 +55,7 @@
 
             <!-- Main Timer Center -->
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                <TextBlock Text="{Binding SlackingTimerText}" FontSize="30" Foreground="Gray" HorizontalAlignment="Center" Margin="0,0,0,10"/>
                 <TextBlock Text="{Binding MainTimerText}" FontSize="100" FontWeight="Bold" HorizontalAlignment="Center"/>
                 <TextBlock Text="{Binding TotalTimerText}" FontSize="20" Opacity="0.6" HorizontalAlignment="Center"/>
             </StackPanel>
@@ -69,23 +71,43 @@
 
             <!-- Settings Overlay -->
             <Border Visibility="{Binding IsSettingsVisible, Converter={StaticResource BoolToVis}}" Background="#DDFFFFFF" CornerRadius="10">
-                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Width="300" Background="White" Margin="20">
-                    <TextBlock Text="设置" FontWeight="Bold" FontSize="20" Margin="10" Foreground="Black"/>
-                    <Button Content="{Binding AddFocusedWindowText}" Margin="10,5" Command="{Binding AddFocusedWindowCommand}" Foreground="Black"/>
-                    
-                    <ComboBox Margin="10" ItemsSource="{Binding AvailableWindows}" SelectedItem="{Binding SelectedWindowInComboBox, Mode=TwoWay}" />
-                    <Button Content="添加所选窗体" Margin="10,5" Command="{Binding AddWindowCommand}" Foreground="Black"/>
-                    
-                    <TextBlock Text="已添加窗体:" Margin="10,10,10,0" Foreground="Black"/>
-                    <ListBox Height="100" Margin="10,5" ItemsSource="{Binding TargetWindows}" SelectedItem="{Binding SelectedWindowInListBox, Mode=TwoWay}" Foreground="Black"/>
-                    <Button Content="删除选中" Margin="10,5" Command="{Binding DeleteWindowCommand}" Foreground="Black"/>
-                    
-                    <StackPanel Orientation="Horizontal" Margin="10">
-                        <TextBlock Text="循环时间 (分钟):" VerticalAlignment="Center" Foreground="Black"/>
-                        <TextBox Width="50" Margin="10,0" Text="{Binding CycleMinutes, UpdateSourceTrigger=PropertyChanged}" Foreground="Black"/>
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <StackPanel Width="300" Background="White" Margin="20">
+                        <TextBlock Text="设置" FontWeight="Bold" FontSize="20" Margin="10" Foreground="Black"/>
+                        <Button Content="{Binding AddFocusedWindowText}" Margin="10,5" Command="{Binding AddFocusedWindowCommand}" Foreground="Black"/>
+
+                        <ComboBox Margin="10" ItemsSource="{Binding AvailableWindows}" SelectedItem="{Binding SelectedWindowInComboBox, Mode=TwoWay}" />
+                        <Button Content="添加所选窗体" Margin="10,5" Command="{Binding AddWindowCommand}" Foreground="Black"/>
+
+                        <TextBlock Text="已添加窗体:" Margin="10,10,10,0" Foreground="Black"/>
+                        <ListBox Height="100" Margin="10,5" ItemsSource="{Binding TargetWindows}" SelectedItem="{Binding SelectedWindowInListBox, Mode=TwoWay}" Foreground="Black"/>
+                        <Button Content="删除选中" Margin="10,5" Command="{Binding DeleteWindowCommand}" Foreground="Black"/>
+
+                        <StackPanel Orientation="Horizontal" Margin="10">
+                            <TextBlock Text="循环时间 (分钟):" VerticalAlignment="Center" Foreground="Black"/>
+                            <TextBox Width="50" Margin="10,0" Text="{Binding CycleMinutes, UpdateSourceTrigger=PropertyChanged}" Foreground="Black"/>
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal" Margin="10">
+                            <TextBlock Text="摸鱼提示时长 (分钟):" VerticalAlignment="Center" Foreground="Black"/>
+                            <TextBox Width="50" Margin="10,0" Text="{Binding SlackingNotificationInterval, UpdateSourceTrigger=PropertyChanged}" Foreground="Black"/>
+                        </StackPanel>
+
+                        <Button Content="关闭设置" Margin="10" Command="{Binding CloseSettingsCommand}" Foreground="Black"/>
                     </StackPanel>
-                    
-                    <Button Content="关闭设置" Margin="10" Command="{Binding CloseSettingsCommand}" Foreground="Black"/>
+                </ScrollViewer>
+            </Border>
+
+            <!-- Rest Overlay -->
+            <Border Visibility="{Binding IsRestOverlayVisible, Converter={StaticResource BoolToVis}}" Background="#DDFFFFFF" CornerRadius="10">
+                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Width="300" Background="White" Margin="20">
+                    <TextBlock Text="{Binding TotalRestText}" FontWeight="Bold" FontSize="16" Margin="10" Foreground="Black" HorizontalAlignment="Center"/>
+                    <TextBlock Text="请输入休息时间" Margin="10,5" Foreground="Black" HorizontalAlignment="Center"/>
+                    <TextBox Width="100" Margin="10" Text="{Binding RestInputMinutes, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Center"/>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <Button Content="确定" Margin="10" Command="{Binding StartRestCommand}" Foreground="Black"/>
+                        <Button Content="关闭" Margin="10" Command="{Binding CloseRestOverlayCommand}" Foreground="Black"/>
+                    </StackPanel>
                 </StackPanel>
             </Border>
         </Grid>

@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Threading;
+using Microsoft.Toolkit.Uwp.Notifications;
 
 namespace Clock
 {
@@ -32,7 +33,7 @@ namespace Clock
         }
 
         public override string ToString() => string.IsNullOrWhiteSpace(Title) ? $"{ProcessName} ({ClassName})" : Title;
-        public bool Equals(TargetWindowInfo other)
+        public bool Equals(TargetWindowInfo? other)
         {
             if (other is null) return false;
             return ClassName == other.ClassName && ProcessName == other.ProcessName && ExecutablePath == other.ExecutablePath;
@@ -111,6 +112,31 @@ namespace Clock
         private bool _isAddingFocusedWindow = false;
 
         [ObservableProperty]
+        private string _slackingTimerText = "00 : 00";
+
+        [ObservableProperty]
+        private int _slackingNotificationInterval = 15;
+
+        private TimeSpan _currentSlackingTime = TimeSpan.Zero;
+        private int _lastNotifiedSlackingMinutes = 0;
+
+        [ObservableProperty]
+        private bool _isRestOverlayVisible = false;
+
+        [ObservableProperty]
+        private int _restInputMinutes = 5;
+
+        [ObservableProperty]
+        private string _totalRestText = "今天你休息了0分钟";
+
+        [ObservableProperty]
+        private string _restButtonText = "休息";
+
+        private bool _isResting = false;
+        private TimeSpan _restTimeRemaining = TimeSpan.Zero;
+        private TimeSpan _totalRestTime = TimeSpan.Zero;
+
+        [ObservableProperty]
         private SolidColorBrush _timingStatusBrush = new SolidColorBrush(Colors.Gold);
 
         public ObservableCollection<TargetWindowInfo> TargetWindows { get; } = new ObservableCollection<TargetWindowInfo>();
@@ -132,6 +158,21 @@ namespace Clock
         {
             UpdateDayCountdown();
 
+            if (_isResting)
+            {
+                _restTimeRemaining = _restTimeRemaining.Subtract(TimeSpan.FromSeconds(1));
+                if (_restTimeRemaining.TotalSeconds <= 0)
+                {
+                    EndRest(auto: true);
+                }
+                else
+                {
+                    SlackingTimerText = $"还有{Math.Ceiling(_restTimeRemaining.TotalMinutes)}分钟休息结束，好好休息吧";
+                }
+                TimingStatusBrush = new SolidColorBrush(Colors.Gray);
+                return;
+            }
+
             bool isTiming = IsUserActive() && IsTargetWindowFocused();
             TimingStatusBrush = isTiming ? new SolidColorBrush(Colors.LimeGreen) : new SolidColorBrush(Colors.Gold);
 
@@ -139,15 +180,42 @@ namespace Clock
             {
                 _currentSessionTime = _currentSessionTime.Add(TimeSpan.FromSeconds(1));
 
+                if (_currentSlackingTime.TotalSeconds > 0)
+                {
+                    _currentSlackingTime = _currentSlackingTime.Subtract(TimeSpan.FromSeconds(1));
+                    int currentMins = (int)_currentSlackingTime.TotalMinutes;
+                    if (currentMins < _lastNotifiedSlackingMinutes)
+                    {
+                        _lastNotifiedSlackingMinutes = currentMins;
+                    }
+                }
+
                 if (_currentSessionTime.TotalMinutes >= CycleMinutes)
                 {
                     _totalTime = _totalTime.Add(_currentSessionTime);
                     _currentSessionTime = TimeSpan.Zero;
                     _cycleCounter++;
-                    // Custom Event Trigger if necessary
                 }
                 UpdateTimersUI();
             }
+            else
+            {
+                _currentSlackingTime = _currentSlackingTime.Add(TimeSpan.FromSeconds(1));
+                int currentSlackingMins = (int)_currentSlackingTime.TotalMinutes;
+
+                if (SlackingNotificationInterval > 0 && 
+                    currentSlackingMins > 0 && 
+                    currentSlackingMins % SlackingNotificationInterval == 0 && 
+                    currentSlackingMins != _lastNotifiedSlackingMinutes)
+                {
+                    _lastNotifiedSlackingMinutes = currentSlackingMins;
+                    new ToastContentBuilder()
+                        .AddText($"你已经摸鱼了{currentSlackingMins}分钟了！")
+                        .Show();
+                }
+            }
+
+            SlackingTimerText = $"{(int)_currentSlackingTime.TotalMinutes:D2} : {_currentSlackingTime.Seconds:D2}";
         }
 
         private bool IsUserActive()
@@ -305,6 +373,55 @@ namespace Clock
             }
         }
 
+        [RelayCommand]
+        private void ToggleRest()
+        {
+            if (_isResting)
+            {
+                var res = MessageBox.Show("是否结束休息？", "提示", MessageBoxButton.YesNo);
+                if (res == MessageBoxResult.Yes)
+                {
+                    EndRest(auto: false);
+                }
+            }
+            else
+            {
+                TotalRestText = $"今天你休息了{(int)_totalRestTime.TotalMinutes}分钟";
+                IsRestOverlayVisible = true;
+            }
+        }
+
+        [RelayCommand]
+        private void StartRest()
+        {
+            _isResting = true;
+            _restTimeRemaining = TimeSpan.FromMinutes(RestInputMinutes);
+            _totalRestTime = _totalRestTime.Add(_restTimeRemaining);
+            IsRestOverlayVisible = false;
+            RestButtonText = "结束休息";
+            TimingStatusBrush = new SolidColorBrush(Colors.Gray);
+            SlackingTimerText = $"还有{Math.Ceiling(_restTimeRemaining.TotalMinutes)}分钟休息结束，好好休息吧";
+        }
+
+        [RelayCommand]
+        private void CloseRestOverlay()
+        {
+            IsRestOverlayVisible = false;
+        }
+
+        private void EndRest(bool auto)
+        {
+            _isResting = false;
+            RestButtonText = "休息";
+            if (auto)
+            {
+                new ToastContentBuilder()
+                    .AddText("休息结束，继续工作吧")
+                    .Show();
+            }
+            SlackingTimerText = $"{(int)_currentSlackingTime.TotalMinutes:D2} : {_currentSlackingTime.Seconds:D2}";
+        }
+
         public void SaveData()
         {
             var data = new AppData
@@ -313,7 +430,9 @@ namespace Clock
                 TargetWindows = TargetWindows.ToArray(),
                 TargetDate = _targetDate,
                 CycleCounter = _cycleCounter,
-                CycleMinutes = CycleMinutes
+                CycleMinutes = CycleMinutes,
+                SlackingNotificationInterval = SlackingNotificationInterval,
+                TotalRestTime = _totalRestTime
             };
             File.WriteAllText("save.sv", JsonSerializer.Serialize(data));
         }
@@ -331,6 +450,8 @@ namespace Clock
                         _targetDate = data.TargetDate;
                         _cycleCounter = data.CycleCounter;
                         CycleMinutes = data.CycleMinutes > 0 ? data.CycleMinutes : 60;
+                        SlackingNotificationInterval = data.SlackingNotificationInterval > 0 ? data.SlackingNotificationInterval : 15;
+                        _totalRestTime = data.TotalRestTime;
 
                         if (data.TargetWindows != null)
                         {
@@ -360,5 +481,7 @@ namespace Clock
         public DateTime? TargetDate { get; set; }
         public int CycleCounter { get; set; }
         public int CycleMinutes { get; set; }
+        public int SlackingNotificationInterval { get; set; }
+        public TimeSpan TotalRestTime { get; set; }
     }
 }
